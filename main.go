@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -43,10 +45,54 @@ func main() {
 			}
 		}
 		w.WriteHeader(http.StatusOK)
-	})
+	}).Methods("DELETE")
+
+	r.HandleFunc("/movies/{id}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		params := mux.Vars(r)
+		id := params["id"]
+		for _, v := range movies {
+			if v.ID == id {
+				json.NewEncoder(w).Encode(v)
+				break
+			}
+		}
+	}).Methods("GET")
+
+	r.HandleFunc("/movies", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var movie Movie
+		err := json.NewDecoder(r.Body).Decode(&movie)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Wrong Body Format"))
+		}
+		movie.ID = strconv.Itoa(rand.Intn(1000))
+		movies = append(movies, movie)
+		json.NewEncoder(w).Encode(movie)
+	}).Methods("POST")
+
+	r.HandleFunc("/movies/{id}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		params := mux.Vars(r)
+
+		for i, v := range movies {
+			if v.ID == params["id"] {
+				movies = append(movies[:i], movies[i+1:]...)
+				var movie Movie
+				json.NewDecoder(r.Body).Decode(&movie)
+				movie.ID = params["id"]
+				movies = append(movies, movie)
+				json.NewEncoder(w).Encode(movie)
+				break
+			}
+		}
+	}).Methods("PUT")
+
 	server := http.Server{
-		ReadTimeout:  120 * time.Second,
-		WriteTimeout: 120 * time.Second,
+		ReadTimeout:  60 * time.Second,
+		WriteTimeout: 90 * time.Second,
 		IdleTimeout:  120 * time.Second,
 		Addr:         ":8000",
 		Handler:      r,
