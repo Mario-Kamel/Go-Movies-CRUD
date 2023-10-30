@@ -23,41 +23,40 @@ type Director struct {
 	LastName  string `json:"last_name"`
 }
 
-var movies []Movie
-
 func main() {
 	r := mux.NewRouter()
-	movies = append(movies, Movie{ID: "1", Title: "Movie1", Director: &Director{FirstName: "Director", LastName: "One"}})
-	movies = append(movies, Movie{ID: "2", Title: "Movie2", Director: &Director{FirstName: "Director", LastName: "Two"}})
+	movies := make(map[string]Movie)
+
+	movies["1"] = Movie{ID: "1", Title: "Movie1", Director: &Director{FirstName: "Director", LastName: "One"}}
+	movies["2"] = Movie{ID: "2", Title: "Movie2", Director: &Director{FirstName: "Director", LastName: "Two"}}
 
 	r.HandleFunc("/movies", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(movies)
-	}).Methods("GET")
-
-	r.HandleFunc("/movies/{id}", func(w http.ResponseWriter, r *http.Request) {
-		params := mux.Vars(r)
-		id := params["id"]
-		for i, v := range movies {
-			if v.ID == id {
-				movies = append(movies[:i], movies[i+1:]...)
-				break
-			}
+		list := make([]Movie, 0)
+		for _, v := range movies {
+			list = append(list, v)
 		}
-		w.WriteHeader(http.StatusOK)
-	}).Methods("DELETE")
+		json.NewEncoder(w).Encode(list)
+	}).Methods("GET")
 
 	r.HandleFunc("/movies/{id}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		params := mux.Vars(r)
 		id := params["id"]
-		for _, v := range movies {
-			if v.ID == id {
-				json.NewEncoder(w).Encode(v)
-				break
-			}
+		movie, ok := movies[id]
+		if ok {
+			json.NewEncoder(w).Encode(movie)
 		}
+		w.WriteHeader(http.StatusNotFound)
+
 	}).Methods("GET")
+
+	r.HandleFunc("/movies/{id}", func(w http.ResponseWriter, r *http.Request) {
+		params := mux.Vars(r)
+		id := params["id"]
+		delete(movies, id)
+		w.WriteHeader(http.StatusOK)
+	}).Methods("DELETE")
 
 	r.HandleFunc("/movies", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -68,7 +67,7 @@ func main() {
 			w.Write([]byte("Wrong Body Format"))
 		}
 		movie.ID = strconv.Itoa(rand.Intn(1000))
-		movies = append(movies, movie)
+		movies[movie.ID] = movie
 		json.NewEncoder(w).Encode(movie)
 	}).Methods("POST")
 
@@ -76,18 +75,12 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 
 		params := mux.Vars(r)
-
-		for i, v := range movies {
-			if v.ID == params["id"] {
-				movies = append(movies[:i], movies[i+1:]...)
-				var movie Movie
-				json.NewDecoder(r.Body).Decode(&movie)
-				movie.ID = params["id"]
-				movies = append(movies, movie)
-				json.NewEncoder(w).Encode(movie)
-				break
-			}
-		}
+		id := params["id"]
+		var movie Movie
+		json.NewDecoder(r.Body).Decode(&movie)
+		movie.ID = id
+		movies[id] = movie
+		json.NewEncoder(w).Encode(movie)
 	}).Methods("PUT")
 
 	server := http.Server{
