@@ -46,6 +46,7 @@ func main() {
 		movie, ok := movies[id]
 		if ok {
 			json.NewEncoder(w).Encode(movie)
+			return
 		}
 		w.WriteHeader(http.StatusNotFound)
 
